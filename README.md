@@ -5,17 +5,17 @@
 
 | 文件（均在 code/ 内） | 职责 |
 |---|---|
-| main.py | 主流程：选地图 → 选算法 → 单人搜索 → 双人搜索 → 动画输出。solve_single / solve_double 返回带计时的结果 dict，供 test 复用；print_solution / print_time_table / export_solution 是共享的输出与导出函数 |
-| constants.py | 常数与共享状态（width / height / map1 / delta 等）+ output_path 输出路径工具（自动创建 output/） |
-| user_input.py | 用户输入。choose_map() 是地图入口（预设 / 文件 / 随机 / 手动四种来源）；另有 read_delta、manual_map（手动逐行输图，大小自动识别）、input_start |
-| map_loader.py | 地图解析与生成：parse_map_text 解析地图文本 / load_file 文件读取 / load_preset 预设加载（maps/ 文件夹）/ generate_random 随机生成（保证全空地与起点连通）；地图大小一律从内容自动读取；换图时自动清空 simulation 缓存 |
+| main.py | 主流程：选地图 → 选算法 → 单人搜索 → 双人搜索 → 动画输出 |
+| constants.py | 常数与共享状态（地图、转头角度、输出路径等），供各模块统一读写 |
+| user_input.py | 用户输入：支持预设地图、随机地图、txt文件输入、手动输入 |
+| map_loader.py | 解析地图文件与地图随机生成 |
 | maps/ | 预设示例地图库（code/maps/，.txt 文件，见下方格式说明） |
-| simulation.py | 视觉（block 遮挡 / can_see 可见性 / visible_mask_at 视野位掩码，均带缓存）+ 运行规则（check 安全性检查 / apply_one 动作系统 / next_step_generator）+ find_all_empty_mask + clear_caches |
-| search_registry.py | 搜索算法注册表。接入新算法：写一个模块提供 search_single / search_double（返回 (是否有解, 路径, 步数)），import 并加进 ALGORITHMS 即可 |
-| BFS_search.py | BFS 搜索（search1 单人 / search2 双人，带步数上界剪枝）；search_single / search_double 是接口别名 |
-| visualization.py | 重放（replay_single / replay_double）与动画（quick_anim，可存 gif）：渐变手电筒视野锥 + 金色边界线，坐标轴固定为地图范围、网格画在格子边界 |
-| test.py | 算法对比基准：像 main 一样输入，对所有注册算法计时跑同样的任务；输出对比表格（最少人数 / 步数 / 守卫面向 / 单双人耗时），每个有解算法导出 output/solution_<算法名>.txt，并生成 output/comparison.png 对比图（图表为英文） |
-| output/ | 运行产物：single.gif / double.gif（动画）、solution.txt 或 solution_<算法名>.txt（最优路径）、comparison.png（对比图）。位置固定在项目根目录（代码文件夹的上一级），与启动命令所在目录无关；已加入 .gitignore |
+| simulation.py | 视觉判定（遮挡 / 可见性 / 视野位掩码，均带缓存）与运行规则（安全性检查、动作系统） |
+| search_registry.py | 搜索算法注册表，可直接接入新算法 |
+| BFS_search.py | BFS 搜索算法（单人 / 双人，带步数上界剪枝） |
+| visualization.py | 可视化: 路径重放与动画（渐变手电筒视野锥） |
+| test.py | 算法对比基准：像 main 一样输入，对所有注册算法计时跑同样的任务；输出对比表格（最少人数/步数/守卫面向/单双人耗时），并生成对比图 |
+| output/ | 运行产物：single.gif / double.gif（动画）、solution.txt（最优路径）、comparison.png（对比图） |
 
 ## 地图文件格式 ##
 
