@@ -1,11 +1,15 @@
 # ==================== 常数与共享状态 ====================
+import os
+
 # eps 很多地方都要用，直接当全局常数
 eps = 0.0001
 
-# 运行生成的文件（动画 gif、对比图等）统一放在这个文件夹里
-import os
-
-OUTPUT_DIR = 'output'
+# 运行生成的文件（动画 gif、对比图、解路径等）统一放在项目根目录
+# （代码文件夹的上一级）的 output 文件夹里。
+# 用代码文件的位置推算绝对路径，跟从哪个目录启动 python 无关，
+# 避免在不同目录运行时生成多个 output。
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(_PROJECT_ROOT, 'output')
 
 
 def output_path(filename):

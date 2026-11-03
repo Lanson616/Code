@@ -24,7 +24,7 @@ def block(position1, position2):
         y = (1 - t) * y1 + t * y2
         ix = int(round(x))
         iy = int(round(y))
-        if constants.map1[ix][iy] == 1 and not (ix, iy) in [position1, position2]:
+        if not constants.is_open(ix, iy) and not (ix, iy) in [position1, position2]:
             block_cache[(position1, position2)] = True
             return True
     block_cache[(position1, position2)] = False
@@ -39,7 +39,7 @@ def can_see(position, guard, face):
     # face 用整数标记，取值 0-11，实际角度 = face * 30 度
     if (position, guard, face) in can_see_cache:
         return can_see_cache[(position, guard, face)]
-    if constants.map1[position[0]][position[1]] == 1:
+    if not constants.is_open(*position):
         can_see_cache[position, guard, face] = False
         return False
     if position == guard:
@@ -72,6 +72,18 @@ def visible_mask_at(position, face):
     return result
 
 
+# ---------- 缓存管理 ----------
+
+
+def clear_caches():
+    # 清空本模块的全部记忆化缓存。
+    # 缓存的 key 不含地图信息，所以每次更换地图后必须清空，否则会读到旧地图的结果
+    block_cache.clear()
+    can_see_cache.clear()
+    visible_mask_at_cache.clear()
+    check_cache.clear()
+
+
 # ---------- 安全性检查 ----------
 
 check_cache = {}
@@ -87,7 +99,7 @@ def check(position1, face1, position2=(-1, -1), face2=0, cleared_mask=0):
         for j in range(constants.height):
             if (cleared_mask >> constants.idx(i, j)) & 1:
                 continue
-            if constants.map1[i][j] == 1:
+            if not constants.is_open(i, j):
                 continue
             if (i, j) == position1 or (i, j) == position2:
                 continue
@@ -141,7 +153,7 @@ def find_all_empty_mask():
     m = 0
     for i in range(constants.width):
         for j in range(constants.height):
-            if constants.map1[i][j] == 0:
+            if constants.is_open(i, j):
                 m |= 1 << constants.idx(i, j)
     constants.all_empty_mask = m
     return m

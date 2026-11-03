@@ -9,6 +9,9 @@ import collections
 import constants
 from simulation import visible_mask_at, check, next_step_generator
 
+# 六种动作：上、下、左、右、逆时针转 delta、顺时针转 delta
+ACTIONS = ['up', 'down', 'left', 'right', 'anticlock', 'clock']
+
 
 def _build_path(state, parent, action):
     # 从终点状态沿 parent 回溯，重建动作序列
@@ -79,9 +82,8 @@ def search2(initial, upper):
             return True, _build_path(state, parent, action), depth[state]
         if depth[state] >= upper:
             return False, None, -1
-        acts = ['up', 'down', 'left', 'right', 'anticlock', 'clock']
-        for a1 in acts:
-            for a2 in acts:
+        for a1 in ACTIONS:
+            for a2 in ACTIONS:
                 ns, act1, act2 = next_step_generator(state, a1, a2)
                 g1, f1, g2, f2, m = ns
                 if (constants.in_bounds(g1[0], g1[1]) and constants.in_bounds(g2[0], g2[1]) and

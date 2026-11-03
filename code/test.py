@@ -1,9 +1,8 @@
 # ==================== test：多种搜索算法对比 ====================
 # 像 main 一样输入地图，然后对所有注册的搜索算法跑同样的搜索任务，
 # 每个算法开始前清空所有记忆化缓存，保证计时公平。
-# 最后打印对比表格，并生成耗时 / 步数对比条形图（保存为 comparison.png）。
-import time
-
+# 输出对比表格（人数 / 步数 / 面向 / 耗时），有解的算法把路径导出到 output/，
+# 并生成耗时 / 步数对比条形图（保存为 output/comparison.png）。
 import matplotlib
 matplotlib.use('TkAgg')          # 强制有界面后端；若报错改 'QtAgg'
 import matplotlib.pyplot as plt
@@ -11,62 +10,65 @@ import matplotlib.pyplot as plt
 import constants
 import user_input
 import search_registry
-from simulation import (visible_mask_at, find_all_empty_mask,
-                        block_cache, can_see_cache, visible_mask_at_cache, check_cache)
-from main import solve_single, solve_double
-
-
-def clear_caches():
-    # 清空 simulation 的全部记忆化缓存，让每个算法都从冷启动开始计时
-    block_cache.clear()
-    can_see_cache.clear()
-    visible_mask_at_cache.clear()
-    check_cache.clear()
+from simulation import visible_mask_at, find_all_empty_mask, clear_caches
+from main import solve_single, solve_double, export_solution, facing_txt
 
 
 def benchmark_one(name, algo, start, test_double=False):
-    # 测一个算法，返回结果字典
+    # 测一个算法，返回结果行（dict）
     clear_caches()
     row = {'algo': name}
     print(f'\n--- 正在测试 {name}（单人搜索，12 个初始面向）---')
-    t0 = time.perf_counter()
-    ok, path, step, face = solve_single(algo, start)
-    t1 = time.perf_counter()
-    row.update(single_ok=ok, single_time=t1 - t0,
-               single_steps=step if ok else None, single_face=face)
-    if ok:
-        print(f'{name} 单人：{step} 步，耗时 {t1 - t0:.3f} 秒')
-    else:
-        print(f'{name} 单人无解，耗时 {t1 - t0:.3f} 秒')
+    res1 = solve_single(algo, start)
+    row.update(single_ok=res1['ok'], single_ms=res1['ms'],
+               single_steps=res1['steps'] if res1['ok'] else None)
+    print(f"{name} 单人：{res1['steps'] if res1['ok'] else '无解'}，耗时 {res1['ms']:.1f} ms")
 
     # 双人搜索非常慢，只有明确要求（且单人无解）时才测
-    if test_double and not ok:
+    if test_double and not res1['ok']:
         print(f'--- 正在测试 {name}（双人搜索，可能很慢）---')
-        t0 = time.perf_counter()
-        ok2, path2, step2, faces = solve_double(algo, start)
-        t1 = time.perf_counter()
-        row.update(double_ok=ok2, double_time=t1 - t0,
-                   double_steps=step2 if ok2 else None, double_faces=faces)
-        print(f'{name} 双人：{step2 if ok2 else "无解"}，耗时 {t1 - t0:.3f} 秒')
+        res2 = solve_double(algo, start)
+        row.update(double_ok=res2['ok'], double_ms=res2['ms'],
+                   double_steps=res2['steps'] if res2['ok'] else None,
+                   double_faces=res2['faces'] if res2['ok'] else None,
+                   double_path=res2['path'] if res2['ok'] else None)
+        print(f"{name} 双人：{res2['steps'] if res2['ok'] else '无解'}，耗时 {res2['ms']:.1f} ms")
+
+    # 有解就导出路径：单人有解记 1 人；单人无解双人有解记 2 人
+    if res1['ok']:
+        facing = facing_txt(res1['face'])
+        row.update(guards=1, steps=res1['steps'], facing=facing)
+        export_solution(f'solution_{name}.txt', name, 1, res1['steps'], facing, res1['path'])
+    elif row.get('double_ok'):
+        f1, f2 = row['double_faces']
+        facing = f'{facing_txt(f1)} / {facing_txt(f2)}'
+        row.update(guards=2, steps=row['double_steps'], facing=facing)
+        export_solution(f'solution_{name}.txt', name, 2, row['double_steps'], facing,
+                        row['double_path'])
     return row
 
 
 def print_table(rows):
-    # 打印对比表格
+    # 打印对比表格：最少人数、步数、守卫面向、单/双人耗时
+    def fmt(v, suffix=''):
+        # None 显示 '-'，其余正常显示
+        return '-' if v is None else f'{v}{suffix}'
+
     print('\n==================== 对比结果 ====================')
-    print(f'{"算法":<8}{"单人有解":<8}{"单人步数":<8}{"单人耗时(s)":<12}'
-          f'{"双人有解":<8}{"双人步数":<8}{"双人耗时(s)":<12}')
+    print(f'{"算法":<8}{"最少人数":<8}{"步数":<6}{"面向":<16}'
+          f'{"单人耗时(ms)":<12}{"双人耗时(ms)":<12}')
     for r in rows:
-        s_ok = '是' if r['single_ok'] else '否'
-        s_steps = r['single_steps'] if r['single_ok'] else '-'
-        d_ok = '是' if r.get('double_ok') else ('否' if r.get('double_ok') is not None else '-')
-        d_steps = r['double_steps'] if r.get('double_ok') else '-'
-        d_time = f"{r['double_time']:.3f}" if r.get('double_time') is not None else '-'
-        print(f"{r['algo']:<8}{s_ok:<8}{s_steps:<8}{r['single_time']:<12.3f}{d_ok:<8}{d_steps:<8}{d_time:<12}")
+        guards = r.get('guards', '-')
+        facing = r.get('facing', '-')
+        facing_str = facing if len(facing) <= 14 else facing[:13] + '…'
+        print(f"{r['algo']:<8}{guards:<8}{fmt(r.get('steps')):<6}{facing_str:<16}"
+              f"{r['single_ms']:<12.1f}{fmt(r.get('double_ms'), ''):<12}")
+        if len(facing) > 14:
+            print(f'{"":<22}{facing}')
 
 
 def plot_comparison(rows, has_double):
-    # 画对比条形图：单一人手一份（耗时、步数）；若测了双人再补两幅
+    # 画对比条形图：单人人手一份（耗时、步数）；若测了双人再补两幅
     names = [r['algo'] for r in rows]
     ncols = 4 if has_double else 2
     fig, axes = plt.subplots(1, ncols, figsize=(6 * ncols, 5))
@@ -81,7 +83,7 @@ def plot_comparison(rows, has_double):
             ax.annotate(text, xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
                         ha='center', va='bottom')
 
-    single_times = [r['single_time'] for r in rows]
+    single_times = [r['single_ms'] / 1000 for r in rows]
     single_steps = [r['single_steps'] if r['single_ok'] else 0 for r in rows]
     single_labels = [str(r['single_steps']) if r['single_ok'] else 'no solution' for r in rows]
     single_colors = ['#4C9BE8' if r['single_ok'] else '#D9534F' for r in rows]
@@ -91,7 +93,7 @@ def plot_comparison(rows, has_double):
         labels=single_labels, colors=single_colors)
 
     if has_double:
-        double_times = [r.get('double_time') or 0 for r in rows]
+        double_times = [(r.get('double_ms') or 0) / 1000 for r in rows]
         double_steps = [r['double_steps'] if r.get('double_ok') else 0 for r in rows]
         double_labels = [str(r['double_steps']) if r.get('double_ok') else
                          ('no solution' if r.get('double_ok') is not None else 'not tested') for r in rows]
@@ -111,9 +113,8 @@ def plot_comparison(rows, has_double):
 
 def main():
     # ---------- 输入（和 main 一样） ----------
-    user_input.read_size_and_delta()
-    user_input.input2()
-    start = user_input.input_start()
+    start = user_input.choose_map()
+    user_input.read_delta()
     find_all_empty_mask()
 
     # ---------- 是否测双人 ----------
@@ -129,7 +130,7 @@ def main():
 
     # ---------- 输出对比 ----------
     print_table(rows)
-    has_double = any(r.get('double_time') is not None for r in rows)
+    has_double = any(r.get('double_ms') is not None for r in rows)
     plot_comparison(rows, has_double)
 
 
