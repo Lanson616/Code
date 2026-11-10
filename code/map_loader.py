@@ -78,6 +78,31 @@ def list_presets():
                   if f.endswith('.txt'))
 
 
+def map_to_text(map1, start=None):
+    # 把 map1 转回地图文件格式文本（S 标起点），与 parse_map_text 互逆
+    height = len(map1[0]) if map1 else 0
+    rows = []
+    for y in range(height):
+        row = ''
+        for x in range(len(map1)):
+            if start == (x, y):
+                row += 'S'
+            elif map1[x][y] == 1:
+                row += '#'
+            else:
+                row += '.'
+        rows.append(row)
+    return '\n'.join(rows)
+
+
+def save_map(name, map1, start):
+    # 把地图保存为 maps/name.txt，返回保存路径
+    path = os.path.join(PRESET_DIR, name + '.txt')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(map_to_text(map1, start) + '\n')
+    return path
+
+
 def _connected(map1, width, height, start):
     # 判断所有空地是否都与 start 连通（四方向）
     total_open = sum(row.count(0) for row in map1)
